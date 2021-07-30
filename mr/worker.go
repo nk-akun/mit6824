@@ -25,10 +25,23 @@ func ihash(key string) int {
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 
-	// Your worker implementation here.
+	workerId := RegisterWork()
+	// TODO: 上报心跳
 
-	// uncomment to send the Example RPC to the master.
-	// CallExample()
+	job := AskJob()
+}
+
+func RegisterWork() uint64 {
+	req := &RegisterReq{}
+	resp := &RegisterResp{}
+	succ := call("Master.RegisterWork", req, resp)
+	if succ {
+		return resp.WorkerId
+	}
+	return 0
+}
+
+func AskJob() {
 
 }
 
@@ -57,7 +70,7 @@ func CallExample() {
 // usually returns true.
 // returns false if something goes wrong.
 func call(rpcname string, args interface{}, reply interface{}) bool {
-	// c, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1234")
+	// c, err := rpc.DialHTTP("tcp", "127.0.0.1"+":3234")
 	sockname := masterSock()
 	c, err := rpc.DialHTTP("unix", sockname)
 	if err != nil {

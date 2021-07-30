@@ -23,7 +23,12 @@ type ExampleReply struct {
 	Y int
 }
 
-// Add your RPC definitions here.
+type RegisterReq struct {
+}
+
+type RegisterResp struct {
+	WorkerId uint64
+}
 
 // Cook up a unique-ish UNIX-domain socket name
 // in /var/tmp, for the master.
