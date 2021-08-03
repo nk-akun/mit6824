@@ -28,7 +28,7 @@ func Worker(mapf func(string, string) []KeyValue,
 	workerId := RegisterWork()
 	// TODO: 上报心跳
 
-	job := AskJob()
+	job := AskJob(workerId)
 }
 
 func RegisterWork() uint64 {
@@ -41,8 +41,12 @@ func RegisterWork() uint64 {
 	return 0
 }
 
-func AskJob() {
-
+func AskJob(workId uint64) {
+	req := &AskJobReq{
+		WorkerId: workId,
+	}
+	resp := &AskJobResp{}
+	call("Master.AllocateJob", req, resp)
 }
 
 // CallExample is an example function to show how to make an RPC call to the master.

@@ -30,6 +30,16 @@ type RegisterResp struct {
 	WorkerId uint64
 }
 
+type AskJobReq struct {
+	WorkerId uint64
+}
+
+type AskJobResp struct {
+	Type   byte
+	Id     uint64
+	Source string
+}
+
 // Cook up a unique-ish UNIX-domain socket name
 // in /var/tmp, for the master.
 // Can't use the current directory since
