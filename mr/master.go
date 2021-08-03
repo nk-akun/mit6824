@@ -23,6 +23,7 @@ type JobManager struct {
 type Job struct {
 	Type   byte // map or reduce
 	Id     uint64
+	RNum   int
 	Source string
 }
 
@@ -71,9 +72,11 @@ func (m *Master) RegisterWork(args *RegisterReq, reply *RegisterResp) error {
 func (m *Master) AllocateJob(args *AskJobReq, reply *AskJobResp) error {
 	// workerId := args.WorkerId
 	job := <-m.JobManager.Jobs
-	reply.Id = job.Id
-	reply.Source = job.Source
-	reply.Type = job.Type
+	reply.Job = &Job{
+		Type:   job.Type,
+		Id:     job.Id,
+		Source: job.Source,
+	}
 	return nil
 }
 
@@ -95,6 +98,7 @@ func MakeMaster(files []string, nReduce int) *Master {
 		job := &Job{
 			Type:   0,
 			Id:     atomic.AddUint64(&m.JobManager.Counter, 1),
+			RNum:   nReduce,
 			Source: f,
 		}
 		m.JobManager.Jobs <- job

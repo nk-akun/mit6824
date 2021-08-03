@@ -35,9 +35,7 @@ type AskJobReq struct {
 }
 
 type AskJobResp struct {
-	Type   byte
-	Id     uint64
-	Source string
+	Job *Job
 }
 
 // Cook up a unique-ish UNIX-domain socket name

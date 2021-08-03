@@ -3,8 +3,10 @@ package mr
 import (
 	"fmt"
 	"hash/fnv"
+	"io/ioutil"
 	"log"
 	"net/rpc"
+	"os"
 )
 
 // KeyValue is the type of the slice contents returned by the Map functions.
@@ -29,6 +31,9 @@ func Worker(mapf func(string, string) []KeyValue,
 	// TODO: 上报心跳
 
 	job := AskJob(workerId)
+	if job.Type == 0 {
+		doMap(mapf, job)
+	}
 }
 
 func RegisterWork() uint64 {
@@ -41,33 +46,37 @@ func RegisterWork() uint64 {
 	return 0
 }
 
-func AskJob(workId uint64) {
+func AskJob(workId uint64) *Job {
+	if workId == 0 {
+		return nil
+	}
 	req := &AskJobReq{
 		WorkerId: workId,
 	}
 	resp := &AskJobResp{}
-	call("Master.AllocateJob", req, resp)
+	succ := call("Master.AllocateJob", req, resp)
+	if succ {
+		return resp.Job
+	}
+	return nil
 }
 
-// CallExample is an example function to show how to make an RPC call to the master.
-//
-// the RPC argument and reply types are defined in rpc.go.
-func CallExample() {
+func doMap(mapf func(string, string) []KeyValue, job *Job) {
+	fileName := job.Source
+	f, _ := os.Open(fileName)
+	defer f.Close()
 
-	// declare an argument structure.
-	args := ExampleArgs{}
+	wrFiles := make([]string, job.RNum)
+	for i := 0; i < job.RNum; i++ {
+		file := fmt.Sprintf("temporary_file_%d_%d.map", i, job.Id)
+		wrFiles[i] = file
+	}
 
-	// fill in the argument(s).
-	args.X = 99
-
-	// declare a reply structure.
-	reply := ExampleReply{}
-
-	// send the RPC request, wait for the reply.
-	call("Master.Example", &args, &reply)
-
-	// reply.Y should be 100.
-	fmt.Printf("reply.Y %v\n", reply.Y)
+	content, _ := ioutil.ReadAll(f)
+	kvas := mapf(fileName, string(content))
+	for _, kv := range kvas {
+		hash := ihash(kv.Key)
+	}
 }
 
 // call sends an RPC request to the master, wait for the response.
