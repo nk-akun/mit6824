@@ -1,12 +1,16 @@
 package mr
 
 import (
+	"bufio"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/rpc"
 	"os"
+	"sort"
+	"strings"
 )
 
 // KeyValue is the type of the slice contents returned by the Map functions.
@@ -65,6 +69,7 @@ func ExecJob(mapf func(string, string) []KeyValue,
 			}
 		}
 	} else {
+		doReduce(reducef, job)
 	}
 
 	return result
@@ -109,14 +114,53 @@ func doMap(mapf func(string, string) []KeyValue, job *Job) ([]string, error) {
 
 	for i := range wrFiles {
 		f, _ = os.Create(wrFiles[i])
-		// TODO: 刷入前排序
-		for _, kv := range wrCache[wrFiles[i]] {
+
+		kvas := wrCache[wrFiles[i]]
+		sort.Slice(kvas, func(i, j int) bool { return kvas[i].Key < kvas[j].Key })
+
+		for _, kv := range kvas {
 			f.WriteString(fmt.Sprintf("%s %s\n", kv.Key, kv.Value))
 		}
 		f.Close()
 	}
 
 	return wrFiles, nil
+}
+
+func doReduce(reducef func(string, []string) string, job *Job) (string, error) {
+	f, _ := os.Open(job.Source)
+	r := bufio.NewReader(f)
+	defer f.Close()
+
+	var (
+		reduceRes  map[string]string
+		values     []string
+		currentKey string
+	)
+	for {
+		line, _, err := r.ReadLine()
+		if err == io.EOF {
+			reduceRes[currentKey] = reducef(currentKey, values)
+			break
+		}
+		kv := strings.Split(string(line), " ")
+		if currentKey == "" || kv[0] == currentKey {
+			values = append(values, kv[1])
+		} else {
+			reduceRes[currentKey] = reducef(currentKey, values)
+			values = values[:0]
+		}
+		currentKey = kv[0]
+	}
+
+	outFile := fmt.Sprintf("temporary_reduce_file_%d.out", job.Id)
+	f, _ = os.Open(outFile)
+	defer f.Close()
+
+	for k, v := range reduceRes {
+		f.WriteString(fmt.Sprintf("%s %s\n", k, v))
+	}
+	return outFile, nil
 }
 
 // call sends an RPC request to the master, wait for the response.
