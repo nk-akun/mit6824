@@ -31,19 +31,43 @@ func Worker(mapf func(string, string) []KeyValue,
 	// TODO: 上报心跳
 
 	job := AskJob(workerId)
-	if job.Type == 0 {
-		doMap(mapf, job)
-	}
+	resultReq := ExecJob(mapf, reducef, job)
 }
 
 func RegisterWork() uint64 {
 	req := &RegisterReq{}
 	resp := &RegisterResp{}
-	succ := call("Master.RegisterWork", req, resp)
+	succ := call("Master.RegisterWorker", req, resp)
 	if succ {
 		return resp.WorkerId
 	}
 	return 0
+}
+
+func ExecJob(mapf func(string, string) []KeyValue,
+	reducef func(string, []string) string, job *Job) *JobResultReq {
+
+	var result *JobResultReq
+	if job.Type == 0 {
+		files, err := doMap(mapf, job)
+		if err == nil {
+			result = &JobResultReq{
+				Code:   0,
+				Type:   0,
+				JobId:  job.Id,
+				Source: files,
+			}
+		} else {
+			result = &JobResultReq{
+				Code:  1,
+				Type:  0,
+				JobId: job.Id,
+			}
+		}
+	} else {
+	}
+
+	return result
 }
 
 func AskJob(workId uint64) *Job {
@@ -61,22 +85,38 @@ func AskJob(workId uint64) *Job {
 	return nil
 }
 
-func doMap(mapf func(string, string) []KeyValue, job *Job) {
+func doMap(mapf func(string, string) []KeyValue, job *Job) ([]string, error) {
 	fileName := job.Source
 	f, _ := os.Open(fileName)
 	defer f.Close()
 
 	wrFiles := make([]string, job.RNum)
 	for i := 0; i < job.RNum; i++ {
-		file := fmt.Sprintf("temporary_file_%d_%d.map", i, job.Id)
+		file := fmt.Sprintf("temporary_map_file_%d_%d.out", i, job.Id)
 		wrFiles[i] = file
 	}
+
+	wrCache := make(map[string][]KeyValue)
 
 	content, _ := ioutil.ReadAll(f)
 	kvas := mapf(fileName, string(content))
 	for _, kv := range kvas {
-		hash := ihash(kv.Key)
+		idx := ihash(kv.Key)
+		file := wrFiles[idx]
+		// TODO: 分批刷入文件
+		wrCache[file] = append(wrCache[file], kv)
 	}
+
+	for i := range wrFiles {
+		f, _ = os.Create(wrFiles[i])
+		// TODO: 刷入前排序
+		for _, kv := range wrCache[wrFiles[i]] {
+			f.WriteString(fmt.Sprintf("%s %s\n", kv.Key, kv.Value))
+		}
+		f.Close()
+	}
+
+	return wrFiles, nil
 }
 
 // call sends an RPC request to the master, wait for the response.

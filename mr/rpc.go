@@ -38,6 +38,16 @@ type AskJobResp struct {
 	Job *Job
 }
 
+type JobResultReq struct {
+	Code   int
+	Type   byte
+	JobId  uint64
+	Source []string
+}
+
+type JobResultResp struct {
+}
+
 // Cook up a unique-ish UNIX-domain socket name
 // in /var/tmp, for the master.
 // Can't use the current directory since
