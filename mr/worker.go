@@ -156,6 +156,8 @@ func doReduce(reducef func(string, []string) string, job *Job) ([]string, error)
 		values     []string
 		currentKey string
 	)
+
+	reduceRes = map[string]string{}
 	for {
 		line, _, err := r.ReadLine()
 		if err == io.EOF {
