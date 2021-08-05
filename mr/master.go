@@ -1,7 +1,10 @@
 package mr
 
 import (
+	"bufio"
+	"container/heap"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -96,7 +99,7 @@ func (m *Master) ReportJobResult(args *JobResultReq, reply *JobResultResp) {
 			m.JobManager.RShuffleChan <- s
 		}
 	} else if args.Type == 1 {
-
+		// TODO:
 	}
 }
 
@@ -120,7 +123,56 @@ func (m *Master) ShuffleReduceJobs() {
 }
 
 func mergeKeys(outFile string, inFiles []string) {
+	wf, _ := os.Create(outFile)
+	fps := make([]*os.File, len(inFiles))
+	frs := make([]*bufio.Reader, len(inFiles))
+	for i, f := range inFiles {
+		fp, _ := os.Open(f)
+		frs[i] = bufio.NewReader(fp)
+		fps[i] = fp
+	}
 
+	defer func() {
+		for _, f := range fps {
+			f.Close()
+		}
+		wf.Close()
+	}()
+
+	// 多路归并
+	queue := make(PriorityQueue, len(frs))
+	for i, f := range frs {
+		line, _, err := f.ReadLine()
+		if err == io.EOF {
+			continue
+		}
+
+		kvs := strings.Split(string(line), " ")
+		queue[i] = &Item{
+			filePos:  i,
+			priority: kvs[0],
+			value:    kvs[1],
+			index:    i,
+		}
+	}
+	heap.Init(&queue)
+
+	for len(queue) > 0 {
+		item := heap.Pop(&queue).(*Item)
+		wf.WriteString(fmt.Sprintf("%s %s\n", item.priority, item.value))
+
+		line, _, err := frs[item.filePos].ReadLine()
+		if err == io.EOF {
+			continue
+		}
+
+		kvs := strings.Split(string(line), " ")
+		heap.Push(&queue, &Item{
+			filePos:  item.filePos,
+			priority: kvs[0],
+			value:    kvs[1],
+		})
+	}
 }
 
 // MakeMaster creates a Master.

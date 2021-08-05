@@ -36,6 +36,11 @@ func Worker(mapf func(string, string) []KeyValue,
 
 	job := AskJob(workerId)
 	resultReq := ExecJob(mapf, reducef, job)
+	resultResp := &JobResultResp{}
+	succ := call("Master.ReportJobResult", resultReq, resultResp)
+	if succ {
+		// TODO:
+	}
 }
 
 func RegisterWork() uint64 {
@@ -69,7 +74,21 @@ func ExecJob(mapf func(string, string) []KeyValue,
 			}
 		}
 	} else {
-		doReduce(reducef, job)
+		files, err := doReduce(reducef, job)
+		if err == nil {
+			result = &JobResultReq{
+				Code:   0,
+				Type:   1,
+				JobId:  job.Id,
+				Source: files,
+			}
+		} else {
+			result = &JobResultReq{
+				Code:  1,
+				Type:  1,
+				JobId: job.Id,
+			}
+		}
 	}
 
 	return result
@@ -127,7 +146,7 @@ func doMap(mapf func(string, string) []KeyValue, job *Job) ([]string, error) {
 	return wrFiles, nil
 }
 
-func doReduce(reducef func(string, []string) string, job *Job) (string, error) {
+func doReduce(reducef func(string, []string) string, job *Job) ([]string, error) {
 	f, _ := os.Open(job.Source)
 	r := bufio.NewReader(f)
 	defer f.Close()
@@ -160,7 +179,7 @@ func doReduce(reducef func(string, []string) string, job *Job) (string, error) {
 	for k, v := range reduceRes {
 		f.WriteString(fmt.Sprintf("%s %s\n", k, v))
 	}
-	return outFile, nil
+	return []string{outFile}, nil
 }
 
 // call sends an RPC request to the master, wait for the response.
