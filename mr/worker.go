@@ -172,7 +172,7 @@ func doReduce(reducef func(string, []string) string, job *Job) ([]string, error)
 		currentKey = kv[0]
 	}
 
-	outFile := fmt.Sprintf("temporary_reduce_file_%d.out", job.Id)
+	outFile := fmt.Sprintf("mr-out-%d.out", job.Id)
 	f, _ = os.Open(outFile)
 	defer f.Close()
 

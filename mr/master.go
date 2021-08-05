@@ -26,6 +26,7 @@ type JobManager struct {
 	Counter      uint64
 	Jobs         chan *Job // 任务队列
 	RShuffleChan chan string
+	SuccNum      int64
 }
 
 type Job struct {
@@ -63,11 +64,8 @@ func (m *Master) server() {
 // Done is called periodically to find out
 // if the entire job has finished.
 func (m *Master) Done() bool {
-	ret := false
-
-	// Your code here.
-
-	return ret
+	succNum := atomic.LoadInt64(&m.JobManager.SuccNum)
+	return succNum == int64(m.Rnum)
 }
 
 func (m *Master) RegisterWorker(args *RegisterReq, reply *RegisterResp) error {
@@ -99,7 +97,7 @@ func (m *Master) ReportJobResult(args *JobResultReq, reply *JobResultResp) {
 			m.JobManager.RShuffleChan <- s
 		}
 	} else if args.Type == 1 {
-		// TODO:
+		atomic.AddInt64(&m.JobManager.SuccNum, 1)
 	}
 }
 
@@ -109,7 +107,6 @@ func (m *Master) ShuffleReduceJobs() {
 		rdIdx := strings.Split(f, "_")[3]
 		rdMap[rdIdx] = append(rdMap[rdIdx], f)
 		if len(rdMap[rdIdx]) == m.Mnum {
-			// TODO: 归并排序
 			reduceFile := fmt.Sprintf("reduce_file_%s", rdIdx)
 			mergeKeys(reduceFile, rdMap[rdIdx])
 			m.JobManager.Jobs <- &Job{
@@ -201,6 +198,7 @@ func MakeMaster(files []string, nReduce int) *Master {
 		m.JobManager.Jobs <- job
 	}
 
+	go m.ShuffleReduceJobs()
 	m.server()
 	return &m
 }
