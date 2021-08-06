@@ -34,13 +34,20 @@ func Worker(mapf func(string, string) []KeyValue,
 	workerId := RegisterWork()
 	// TODO: 上报心跳
 
-	job := AskJob(workerId)
-	resultReq := ExecJob(mapf, reducef, job)
-	resultResp := &JobResultResp{}
-	succ := call("Master.ReportJobResult", resultReq, resultResp)
-	if succ {
-		// TODO:
+	for {
+		job := AskJob(workerId)
+		if job == nil {
+			break
+		}
+
+		resultReq := ExecJob(mapf, reducef, job)
+		resultResp := &JobResultResp{}
+		succ := call("Master.ReportJobResult", resultReq, resultResp)
+		if succ {
+			fmt.Printf("上报成功\n")
+		}
 	}
+	fmt.Printf("worker结束\n")
 }
 
 func RegisterWork() uint64 {
@@ -125,7 +132,7 @@ func doMap(mapf func(string, string) []KeyValue, job *Job) ([]string, error) {
 	content, _ := ioutil.ReadAll(f)
 	kvas := mapf(fileName, string(content))
 	for _, kv := range kvas {
-		idx := ihash(kv.Key)
+		idx := ihash(kv.Key) % job.RNum
 		file := wrFiles[idx]
 		// TODO: 分批刷入文件
 		wrCache[file] = append(wrCache[file], kv)

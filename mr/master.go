@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
+	"time"
 )
 
 // Master for MapReduce
@@ -77,19 +78,26 @@ func (m *Master) RegisterWorker(args *RegisterReq, reply *RegisterResp) error {
 
 func (m *Master) AllocateJob(args *AskJobReq, reply *AskJobResp) error {
 	// workerId := args.WorkerId
-	job := <-m.JobManager.Jobs
-	reply.Job = &Job{
-		Type:   job.Type,
-		Id:     job.Id,
-		Source: job.Source,
+	ticker := time.NewTicker(10 * time.Second)
+	select {
+	case <-ticker.C:
+		return fmt.Errorf("no job")
+	case job := <-m.JobManager.Jobs:
+		// TODO: 任务是否完成的监控
+		reply.Job = &Job{
+			Type:   job.Type,
+			Id:     job.Id,
+			Source: job.Source,
+			RNum:   m.Rnum,
+		}
+		return nil
 	}
-	return nil
 }
 
-func (m *Master) ReportJobResult(args *JobResultReq, reply *JobResultResp) {
+func (m *Master) ReportJobResult(args *JobResultReq, reply *JobResultResp) error {
 	if args.Code != 0 {
 		// TODO: 错误处理
-		return
+		return nil
 	}
 
 	if args.Type == 0 {
@@ -99,6 +107,7 @@ func (m *Master) ReportJobResult(args *JobResultReq, reply *JobResultResp) {
 	} else if args.Type == 1 {
 		atomic.AddInt64(&m.JobManager.SuccNum, 1)
 	}
+	return nil
 }
 
 func (m *Master) ShuffleReduceJobs() {
