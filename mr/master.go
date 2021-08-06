@@ -112,12 +112,13 @@ func (m *Master) ReportJobResult(args *JobResultReq, reply *JobResultResp) error
 
 func (m *Master) ShuffleReduceJobs() {
 	rdMap := make(map[string][]string, m.Rnum)
+	// RShuffleChan采用无缓冲chan会hang死，好的解决方案?
 	for f := range m.JobManager.RShuffleChan {
 		rdIdx := strings.Split(f, "_")[3]
 		rdMap[rdIdx] = append(rdMap[rdIdx], f)
 		if len(rdMap[rdIdx]) == m.Mnum {
-			reduceFile := fmt.Sprintf("reduce_file_%s", rdIdx)
-			mergeKeys(reduceFile, rdMap[rdIdx])
+			reduceFile := fmt.Sprintf("./data-out/reduce_file_%s.out", rdIdx)
+			mergeKeys(rdMap[rdIdx], reduceFile)
 			m.JobManager.Jobs <- &Job{
 				Type:   1,
 				Id:     atomic.AddUint64(&m.JobManager.Counter, 1),
@@ -128,12 +129,15 @@ func (m *Master) ShuffleReduceJobs() {
 	}
 }
 
-func mergeKeys(outFile string, inFiles []string) {
+func mergeKeys(inFiles []string, outFile string) {
 	wf, _ := os.Create(outFile)
 	fps := make([]*os.File, len(inFiles))
 	frs := make([]*bufio.Reader, len(inFiles))
 	for i, f := range inFiles {
-		fp, _ := os.Open(f)
+		fp, err := os.Open(f)
+		if err != nil {
+			fmt.Printf("error:%v\n", err)
+		}
 		frs[i] = bufio.NewReader(fp)
 		fps[i] = fp
 	}
@@ -147,8 +151,8 @@ func mergeKeys(outFile string, inFiles []string) {
 
 	// 多路归并
 	queue := make(PriorityQueue, len(frs))
-	for i, f := range frs {
-		line, _, err := f.ReadLine()
+	for i, fr := range frs {
+		line, _, err := fr.ReadLine()
 		if err == io.EOF {
 			continue
 		}
@@ -189,8 +193,9 @@ func MakeMaster(files []string, nReduce int) *Master {
 		Mnum: len(files),
 		Rnum: nReduce,
 		JobManager: &JobManager{
-			Counter: 0,
-			Jobs:    make(chan *Job, len(files)),
+			Counter:      0,
+			Jobs:         make(chan *Job, len(files)),
+			RShuffleChan: make(chan string, len(files)), // TODO: 是否可以优化
 		},
 		WorkerManager: &WorkerManager{
 			Counter: 0,

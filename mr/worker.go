@@ -66,6 +66,7 @@ func ExecJob(mapf func(string, string) []KeyValue,
 	var result *JobResultReq
 	if job.Type == 0 {
 		files, err := doMap(mapf, job)
+		fmt.Println(files, err)
 		if err == nil {
 			result = &JobResultReq{
 				Code:   0,
@@ -123,7 +124,7 @@ func doMap(mapf func(string, string) []KeyValue, job *Job) ([]string, error) {
 
 	wrFiles := make([]string, job.RNum)
 	for i := 0; i < job.RNum; i++ {
-		file := fmt.Sprintf("temporary_map_file_%d_%d.out", i, job.Id)
+		file := fmt.Sprintf("./data-out/temporary_map_file_%d_%d.out", i, job.Id)
 		wrFiles[i] = file
 	}
 
@@ -154,9 +155,9 @@ func doMap(mapf func(string, string) []KeyValue, job *Job) ([]string, error) {
 }
 
 func doReduce(reducef func(string, []string) string, job *Job) ([]string, error) {
-	f, _ := os.Open(job.Source)
-	r := bufio.NewReader(f)
-	defer f.Close()
+	fp, _ := os.Open(job.Source)
+	fr := bufio.NewReader(fp)
+	defer fp.Close()
 
 	var (
 		reduceRes  map[string]string
@@ -166,27 +167,26 @@ func doReduce(reducef func(string, []string) string, job *Job) ([]string, error)
 
 	reduceRes = map[string]string{}
 	for {
-		line, _, err := r.ReadLine()
+		line, _, err := fr.ReadLine()
 		if err == io.EOF {
 			reduceRes[currentKey] = reducef(currentKey, values)
 			break
 		}
 		kv := strings.Split(string(line), " ")
-		if currentKey == "" || kv[0] == currentKey {
-			values = append(values, kv[1])
-		} else {
+		if currentKey != "" && kv[0] != currentKey {
 			reduceRes[currentKey] = reducef(currentKey, values)
 			values = values[:0]
 		}
+		values = append(values, kv[1])
 		currentKey = kv[0]
 	}
 
-	outFile := fmt.Sprintf("mr-out-%d.out", job.Id)
-	f, _ = os.Open(outFile)
-	defer f.Close()
+	outFile := fmt.Sprintf("./data-out/mr-out-%d.out", job.Id)
+	fout, _ := os.Create(outFile)
+	defer fout.Close()
 
 	for k, v := range reduceRes {
-		f.WriteString(fmt.Sprintf("%s %s\n", k, v))
+		fout.WriteString(fmt.Sprintf("%s %s\n", k, v))
 	}
 	return []string{outFile}, nil
 }
