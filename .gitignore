@@ -12,3 +12,4 @@ cmd/mrworker/mrworker
 mr-tmp/
 
 *.so
+*.out
