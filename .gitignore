@@ -1,4 +1,4 @@
-mrapps/crash/*.so
+/mrapps/crash/*.so
 mrapps/indexer/*.so
 mrapps/mtiming/*.so
 mrapps/nocrash/*.so
@@ -9,4 +9,6 @@ cmd/mrmaster/mrmaster
 cmd/mrsequential/mrsequential
 cmd/mrworker/mrworker
 
-mr-tmp
+mr-tmp/
+
+*.so
