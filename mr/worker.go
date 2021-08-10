@@ -124,7 +124,7 @@ func doMap(mapf func(string, string) []KeyValue, job *Job) ([]string, error) {
 
 	wrFiles := make([]string, job.RNum)
 	for i := 0; i < job.RNum; i++ {
-		file := fmt.Sprintf("./data-out/temporary_map_file_%d_%d.out", i, job.Id)
+		file := fmt.Sprintf("./temporary_map_file_%d_%d.out", i, job.Id)
 		wrFiles[i] = file
 	}
 
@@ -181,7 +181,7 @@ func doReduce(reducef func(string, []string) string, job *Job) ([]string, error)
 		currentKey = kv[0]
 	}
 
-	outFile := fmt.Sprintf("./data-out/mr-out-%d.out", job.Id)
+	outFile := fmt.Sprintf("./mr-out-%d.out", job.Id)
 	fout, _ := os.Create(outFile)
 	defer fout.Close()
 

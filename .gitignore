@@ -1,9 +1,9 @@
-# mrapps/crash/*.so
-# mrapps/indexer/*.so
-# mrapps/mtiming/*.so
-# mrapps/nocrash/*.so
-# mrapps/rtiming/*.so
-# mrapps/wc/*.so
+mrapps/crash/*.so
+mrapps/indexer/*.so
+mrapps/mtiming/*.so
+mrapps/nocrash/*.so
+mrapps/rtiming/*.so
+mrapps/wc/*.so
 
 cmd/mrmaster/mrmaster
 cmd/mrsequential/mrsequential

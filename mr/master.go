@@ -117,7 +117,7 @@ func (m *Master) ShuffleReduceJobs() {
 		rdIdx := strings.Split(f, "_")[3]
 		rdMap[rdIdx] = append(rdMap[rdIdx], f)
 		if len(rdMap[rdIdx]) == m.Mnum {
-			reduceFile := fmt.Sprintf("./data-out/reduce_file_%s.out", rdIdx)
+			reduceFile := fmt.Sprintf("./reduce_file_%s.out", rdIdx)
 			mergeKeys(rdMap[rdIdx], reduceFile)
 			m.JobManager.Jobs <- &Job{
 				Type:   1,
