@@ -66,7 +66,6 @@ func ExecJob(mapf func(string, string) []KeyValue,
 	var result *JobResultReq
 	if job.Type == 0 {
 		files, err := doMap(mapf, job)
-		fmt.Println(files, err)
 		if err == nil {
 			result = &JobResultReq{
 				Code:   0,
@@ -119,8 +118,12 @@ func AskJob(workId uint64) *Job {
 
 func doMap(mapf func(string, string) []KeyValue, job *Job) ([]string, error) {
 	fileName := job.Source
-	f, _ := os.Open(fileName)
-	defer f.Close()
+	rf, err := os.Open(fileName)
+	if err != nil {
+		fmt.Printf("error:%v\n", err)
+		return []string{}, err
+	}
+	defer rf.Close()
 
 	wrFiles := make([]string, job.RNum)
 	for i := 0; i < job.RNum; i++ {
@@ -130,7 +133,12 @@ func doMap(mapf func(string, string) []KeyValue, job *Job) ([]string, error) {
 
 	wrCache := make(map[string][]KeyValue)
 
-	content, _ := ioutil.ReadAll(f)
+	content, err := ioutil.ReadAll(rf)
+	if err != nil {
+		fmt.Printf("error:%v\n", err)
+		return []string{}, err
+	}
+
 	kvas := mapf(fileName, string(content))
 	for _, kv := range kvas {
 		idx := ihash(kv.Key) % job.RNum
@@ -140,15 +148,15 @@ func doMap(mapf func(string, string) []KeyValue, job *Job) ([]string, error) {
 	}
 
 	for i := range wrFiles {
-		f, _ = os.Create(wrFiles[i])
+		wf, _ := os.Create(wrFiles[i])
 
 		kvas := wrCache[wrFiles[i]]
 		sort.Slice(kvas, func(i, j int) bool { return kvas[i].Key < kvas[j].Key })
 
 		for _, kv := range kvas {
-			f.WriteString(fmt.Sprintf("%s %s\n", kv.Key, kv.Value))
+			wf.WriteString(fmt.Sprintf("%s %s\n", kv.Key, kv.Value))
 		}
-		f.Close()
+		wf.Close()
 	}
 
 	return wrFiles, nil
