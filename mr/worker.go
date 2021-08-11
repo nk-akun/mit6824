@@ -46,6 +46,8 @@ func Worker(mapf func(string, string) []KeyValue,
 		succ := call("Master.ReportJobResult", resultReq, resultResp)
 		if succ {
 			fmt.Printf("上报成功\n")
+		} else {
+			fmt.Printf("上报失败\n")
 		}
 	}
 	fmt.Printf("worker结束\n")

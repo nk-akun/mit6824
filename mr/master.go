@@ -113,10 +113,14 @@ func (m *Master) ReportHeartbeat(args *HeartbeatReq, reply *HeartbeatResp) error
 
 func (m *Master) ReportJobResult(args *JobResultReq, reply *JobResultResp) error {
 	if args.Code != 0 {
-		// TODO: 错误处理
+		m.redoJob(args.JobId)
 		return nil
 	}
 
+	err := m.markJobDone(args.JobId)
+	if err != nil {
+		return err
+	}
 	if args.Type == 0 {
 		for _, s := range args.Source {
 			m.JobManager.RShuffleChan <- s
@@ -147,18 +151,42 @@ func (m *Master) ShuffleReduceJobs() {
 }
 
 func (m *Master) MonitorJobs() {
-	ticker := time.NewTicker(15 * time.Second)
+	// TODO: 这样做可能会误杀刚进来的job
+	ticker := time.NewTicker(9 * time.Second)
 	for range ticker.C {
 		m.JobManager.Lock()
 		for id, job := range m.JobManager.JobsMonitor {
-			if job.Done {
-				delete(m.JobManager.JobsMonitor, id)
-			} else {
+			if !job.Done {
+				newJobId := atomic.AddUint64(&m.JobManager.Counter, 1)
+				job.Id = newJobId
 				m.JobManager.Jobs <- job
 			}
+			delete(m.JobManager.JobsMonitor, id)
 		}
 		m.JobManager.Unlock()
 	}
+}
+
+func (m *Master) redoJob(jobId uint64) {
+	m.JobManager.Lock()
+	job := m.JobManager.JobsMonitor[jobId]
+	delete(m.JobManager.JobsMonitor, jobId)
+	m.JobManager.Unlock()
+
+	// 生成新id,即使旧id完成了也不收了
+	newJobId := atomic.AddUint64(&m.JobManager.Counter, 1)
+	job.Id = newJobId
+	m.JobManager.Jobs <- job
+}
+
+func (m *Master) markJobDone(jobId uint64) error {
+	m.JobManager.Lock()
+	defer m.JobManager.Unlock()
+	if job, exist := m.JobManager.JobsMonitor[jobId]; exist {
+		job.Done = true
+		return nil
+	}
+	return fmt.Errorf("No this job")
 }
 
 func mergeKeys(inFiles []string, outFile string) {
