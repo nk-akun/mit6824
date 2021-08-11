@@ -157,9 +157,6 @@ func doMap(mapf func(string, string) []KeyValue, job *Job) ([]string, error) {
 	kvas := mapf(fileName, string(content))
 	for _, kv := range kvas {
 		idx := ihash(kv.Key) % job.RNum
-		if kv.Key == "City" {
-			fmt.Printf("file:%d \n", idx)
-		}
 		file := wrFiles[idx]
 		wrCache[file] = append(wrCache[file], kv)
 	}
