@@ -152,7 +152,7 @@ func (m *Master) ShuffleReduceJobs() {
 
 func (m *Master) MonitorJobs() {
 	// TODO: 这样做可能会误杀刚进来的job
-	ticker := time.NewTicker(9 * time.Second)
+	ticker := time.NewTicker(15 * time.Second)
 	for range ticker.C {
 		m.JobManager.Lock()
 		for id, job := range m.JobManager.JobsMonitor {
@@ -160,6 +160,7 @@ func (m *Master) MonitorJobs() {
 				newJobId := atomic.AddUint64(&m.JobManager.Counter, 1)
 				job.Id = newJobId
 				m.JobManager.Jobs <- job
+				m.JobManager.JobsMonitor[job.Id] = job
 			}
 			delete(m.JobManager.JobsMonitor, id)
 		}
@@ -169,14 +170,15 @@ func (m *Master) MonitorJobs() {
 
 func (m *Master) redoJob(jobId uint64) {
 	m.JobManager.Lock()
+	defer m.JobManager.Unlock()
 	job := m.JobManager.JobsMonitor[jobId]
 	delete(m.JobManager.JobsMonitor, jobId)
-	m.JobManager.Unlock()
 
 	// 生成新id,即使旧id完成了也不收了
 	newJobId := atomic.AddUint64(&m.JobManager.Counter, 1)
 	job.Id = newJobId
 	m.JobManager.Jobs <- job
+	m.JobManager.JobsMonitor[job.Id] = job
 }
 
 func (m *Master) markJobDone(jobId uint64) error {
