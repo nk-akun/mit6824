@@ -11,6 +11,7 @@ import (
 	"net/rpc"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -26,8 +27,10 @@ type Master struct {
 type JobManager struct {
 	Counter      uint64
 	Jobs         chan *Job // 任务队列
+	JobsMonitor  map[uint64]*Job
 	RShuffleChan chan string
 	SuccNum      int64
+	sync.Mutex
 }
 
 type Job struct {
@@ -35,6 +38,7 @@ type Job struct {
 	Id     uint64
 	RNum   int
 	Source string
+	Done   bool
 }
 
 type WorkerManager struct {
@@ -43,7 +47,8 @@ type WorkerManager struct {
 }
 
 type Woker struct {
-	Id uint64
+	Id       uint64
+	LastBeat uint64
 }
 
 // Your code here -- RPC handlers for the worker to call.
@@ -89,9 +94,21 @@ func (m *Master) AllocateJob(args *AskJobReq, reply *AskJobResp) error {
 			Id:     job.Id,
 			Source: job.Source,
 			RNum:   m.Rnum,
+			Done:   false,
+		}
+		m.JobManager.JobsMonitor[job.Id] = &Job{
+			Type:   job.Type,
+			Id:     job.Id,
+			Source: job.Source,
+			RNum:   m.Rnum,
+			Done:   false,
 		}
 		return nil
 	}
+}
+
+func (m *Master) ReportHeartbeat(args *HeartbeatReq, reply *HeartbeatResp) error {
+	return nil
 }
 
 func (m *Master) ReportJobResult(args *JobResultReq, reply *JobResultResp) error {
@@ -126,6 +143,21 @@ func (m *Master) ShuffleReduceJobs() {
 				Source: reduceFile,
 			}
 		}
+	}
+}
+
+func (m *Master) MonitorJobs() {
+	ticker := time.NewTicker(15 * time.Second)
+	for range ticker.C {
+		m.JobManager.Lock()
+		for id, job := range m.JobManager.JobsMonitor {
+			if job.Done {
+				delete(m.JobManager.JobsMonitor, id)
+			} else {
+				m.JobManager.Jobs <- job
+			}
+		}
+		m.JobManager.Unlock()
 	}
 }
 
@@ -196,6 +228,7 @@ func MakeMaster(files []string, nReduce int) *Master {
 			Counter:      0,
 			Jobs:         make(chan *Job, len(files)),
 			RShuffleChan: make(chan string, len(files)), // TODO: 是否可以优化
+			JobsMonitor:  make(map[uint64]*Job),
 		},
 		WorkerManager: &WorkerManager{
 			Counter: 0,
@@ -213,6 +246,7 @@ func MakeMaster(files []string, nReduce int) *Master {
 	}
 
 	go m.ShuffleReduceJobs()
+	go m.MonitorJobs()
 	m.server()
 	return &m
 }

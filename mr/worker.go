@@ -11,6 +11,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 )
 
 // KeyValue is the type of the slice contents returned by the Map functions.
@@ -32,7 +33,7 @@ func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 
 	workerId := RegisterWork()
-	// TODO: 上报心跳
+	go ReportHeartbeat(workerId)
 
 	for {
 		job := AskJob(workerId)
@@ -114,6 +115,18 @@ func AskJob(workId uint64) *Job {
 		return resp.Job
 	}
 	return nil
+}
+
+func ReportHeartbeat(workId uint64) {
+	ticker := time.NewTicker(5 * time.Second)
+	req := &HeartbeatReq{
+		WokerId: workId,
+	}
+	resp := &HeartbeatResp{}
+	for range ticker.C {
+		call("Master.ReportHeartbeat", req, resp)
+		fmt.Printf("worker %d 上报心跳\n", workId)
+	}
 }
 
 func doMap(mapf func(string, string) []KeyValue, job *Job) ([]string, error) {
