@@ -142,6 +142,9 @@ func doMap(mapf func(string, string) []KeyValue, job *Job) ([]string, error) {
 	kvas := mapf(fileName, string(content))
 	for _, kv := range kvas {
 		idx := ihash(kv.Key) % job.RNum
+		if kv.Key == "City" {
+			fmt.Printf("file:%d \n", idx)
+		}
 		file := wrFiles[idx]
 		// TODO: 分批刷入文件
 		wrCache[file] = append(wrCache[file], kv)
@@ -150,8 +153,17 @@ func doMap(mapf func(string, string) []KeyValue, job *Job) ([]string, error) {
 	for i := range wrFiles {
 		wf, _ := os.Create(wrFiles[i])
 
-		kvas := wrCache[wrFiles[i]]
+		kvasTmp := wrCache[wrFiles[i]]
+		kvas := make([]KeyValue, len(kvasTmp))
+		copy(kvas, kvasTmp)
+
 		sort.Slice(kvas, func(i, j int) bool { return kvas[i].Key < kvas[j].Key })
+
+		// for j, kv := range kvas {
+		// 	if kv.Key == "City" {
+		// 		fmt.Printf("file:%d City:%d\n", i, j)
+		// 	}
+		// }
 
 		for _, kv := range kvas {
 			wf.WriteString(fmt.Sprintf("%s %s\n", kv.Key, kv.Value))

@@ -161,12 +161,13 @@ func mergeKeys(inFiles []string, outFile string) {
 		queue[i] = &Item{
 			filePos:  i,
 			priority: kvs[0],
-			value:    kvs[1],
+			value:    kvs[1], // 可能不止1呢？
 			index:    i,
 		}
 	}
 	heap.Init(&queue)
 
+	// 可以优化为读取多个，减少io次数
 	for len(queue) > 0 {
 		item := heap.Pop(&queue).(*Item)
 		wf.WriteString(fmt.Sprintf("%s %s\n", item.priority, item.value))
