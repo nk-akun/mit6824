@@ -150,20 +150,19 @@ func mergeKeys(inFiles []string, outFile string) {
 	}()
 
 	// 多路归并
-	queue := make(PriorityQueue, len(frs))
+	queue := make(PriorityQueue, 0, len(frs))
 	for i, fr := range frs {
 		line, _, err := fr.ReadLine()
 		if err == io.EOF {
 			continue
 		}
-
 		kvs := strings.Split(string(line), " ")
-		queue[i] = &Item{
+		queue = append(queue, &Item{
 			filePos:  i,
 			priority: kvs[0],
 			value:    kvs[1], // 可能不止1呢？
 			index:    i,
-		}
+		})
 	}
 	heap.Init(&queue)
 
