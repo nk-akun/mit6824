@@ -44,9 +44,7 @@ func Worker(mapf func(string, string) []KeyValue,
 		resultReq := ExecJob(mapf, reducef, job)
 		resultResp := &JobResultResp{}
 		succ := call("Master.ReportJobResult", resultReq, resultResp)
-		if succ {
-			fmt.Printf("上报成功\n")
-		} else {
+		if !succ {
 			fmt.Printf("上报失败\n")
 		}
 	}
@@ -211,6 +209,9 @@ func doReduce(reducef func(string, []string) string, job *Job) ([]string, error)
 	defer fout.Close()
 
 	for k, v := range reduceRes {
+		if k == "" || k == "\n" {
+			continue
+		}
 		fout.WriteString(fmt.Sprintf("%s %s\n", k, v))
 	}
 	return []string{outFile}, nil
