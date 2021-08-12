@@ -71,7 +71,12 @@ func (m *Master) server() {
 // if the entire job has finished.
 func (m *Master) Done() bool {
 	succNum := atomic.LoadInt64(&m.JobManager.SuccNum)
-	return succNum == int64(m.Rnum)
+	if succNum == int64(m.Rnum) {
+		close(m.JobManager.Jobs) // 安全关闭
+		close(m.JobManager.RShuffleChan)
+		return true
+	}
+	return false
 }
 
 func (m *Master) RegisterWorker(args *RegisterReq, reply *RegisterResp) error {
@@ -88,7 +93,6 @@ func (m *Master) AllocateJob(args *AskJobReq, reply *AskJobResp) error {
 	case <-ticker.C:
 		return fmt.Errorf("no job")
 	case job := <-m.JobManager.Jobs:
-		// TODO: 任务是否完成的监控
 		reply.Job = &Job{
 			Type:   job.Type,
 			Id:     job.Id,
