@@ -87,28 +87,26 @@ func (m *Master) RegisterWorker(args *RegisterReq, reply *RegisterResp) error {
 }
 
 func (m *Master) AllocateJob(args *AskJobReq, reply *AskJobResp) error {
-	// workerId := args.WorkerId
-	ticker := time.NewTicker(10 * time.Second)
-	select {
-	case <-ticker.C:
+	job := <-m.JobManager.Jobs
+	if job == nil {
 		return fmt.Errorf("no job")
-	case job := <-m.JobManager.Jobs:
-		reply.Job = &Job{
-			Type:   job.Type,
-			Id:     job.Id,
-			Source: job.Source,
-			RNum:   m.Rnum,
-			Done:   false,
-		}
-		m.JobManager.JobsMonitor[job.Id] = &Job{
-			Type:   job.Type,
-			Id:     job.Id,
-			Source: job.Source,
-			RNum:   m.Rnum,
-			Done:   false,
-		}
-		return nil
 	}
+
+	reply.Job = &Job{
+		Type:   job.Type,
+		Id:     job.Id,
+		Source: job.Source,
+		RNum:   m.Rnum,
+		Done:   false,
+	}
+	m.JobManager.JobsMonitor[job.Id] = &Job{
+		Type:   job.Type,
+		Id:     job.Id,
+		Source: job.Source,
+		RNum:   m.Rnum,
+		Done:   false,
+	}
+	return nil
 }
 
 func (m *Master) ReportHeartbeat(args *HeartbeatReq, reply *HeartbeatResp) error {
